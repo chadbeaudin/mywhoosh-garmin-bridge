@@ -9,6 +9,9 @@ from bridge.processor import RECONCILE_MIN_AGE_SECONDS, Processor, RetryLater
 from bridge.strava_web import StravaWebError
 
 from .conftest import RIDE_START, garmin_duplicate_payload, make_fit, strava_payload
+from bridge.processor import describe
+from bridge.mywhoosh import Activity
+
 from .fakes import FakeGarmin, FakeMyWhoosh, FakeNotifier, FakeRememberToken, FakeStravaWeb
 
 
@@ -34,6 +37,7 @@ def test_mywhoosh_ride_is_uploaded_as_garmin_edge(db):
     assert file_id.manufacturer == 1
     ride = db.ride("w1")
     assert (ride.status, ride.strava_mywhoosh_id, ride.start_time) == ("uploaded", 1001, RIDE_START)
+    assert h.notifier.messages == [f"Uploaded \"Ride\" ({describe_start()}) to Garmin Connect."]
 
 
 def test_unmatched_ride_retries_later(db):
@@ -48,6 +52,7 @@ def test_ride_already_on_garmin_is_not_uploaded_or_deduplicated(db):
     h.processor.handle_activity(strava_payload())
     assert h.garmin.uploads == []
     assert db.ride("w1").status == "already_on_garmin"
+    assert h.notifier.messages[-1].startswith("Garmin already had")
     h.processor.handle_activity(garmin_duplicate_payload())
     assert h.strava.deleted == []
 
@@ -71,6 +76,7 @@ def test_upload_crash_is_recovered_as_ours(db):
     h.garmin.existing_starts = [RIDE_START]
     h.processor.handle_activity(strava_payload())
     assert db.ride("w1").status == "uploaded"
+    assert h.notifier.messages[-1].startswith("Uploaded")
 
 
 def test_garmin_duplicate_is_deleted(db):
@@ -80,6 +86,7 @@ def test_garmin_duplicate_is_deleted(db):
     assert h.strava.deleted == [1002]
     ride = db.ride("w1")
     assert (ride.status, ride.strava_duplicate_id) == ("duplicate_deleted", 1002)
+    assert h.notifier.messages[-1] == "Deleted the Garmin duplicate https://www.strava.com/activities/1002 from Strava."
 
 
 def test_dry_run_only_reports(db):
@@ -88,7 +95,7 @@ def test_dry_run_only_reports(db):
     h.processor.handle_activity(garmin_duplicate_payload())
     assert h.strava.deleted == []
     assert db.ride("w1").status == "duplicate_dry_run"
-    assert "DRY_RUN" in h.notifier.messages[0] and "/activities/1002" in h.notifier.messages[0]
+    assert "DRY_RUN" in h.notifier.messages[-1] and "/activities/1002" in h.notifier.messages[-1]
 
 
 def test_failed_delete_notifies_with_link(db):
@@ -96,7 +103,7 @@ def test_failed_delete_notifies_with_link(db):
     h.processor.handle_activity(strava_payload())
     h.processor.handle_activity(garmin_duplicate_payload())
     assert db.ride("w1").status == "duplicate_delete_failed"
-    assert "https://www.strava.com/activities/1002" in h.notifier.messages[0]
+    assert "https://www.strava.com/activities/1002" in h.notifier.messages[-1]
 
 
 def test_unrelated_garmin_ride_is_left_alone(db):
@@ -121,6 +128,7 @@ def test_reconcile_uploads_missed_ride_and_marks_pre_install_rides(db):
     h = Harness(db, rides={"old": make_fit(start=old_start), "missed": make_fit(start=missed_start), "fresh": make_fit(start=fresh_start)})
     h.processor.reconcile()
     assert [name for _, name in h.garmin.uploads] == ["mywhoosh_missed"]
+    assert len(h.notifier.messages) == 1 and h.notifier.messages[0].startswith("Uploaded")
     assert db.ride("old").status == "before_install"
     assert db.ride("missed").strava_mywhoosh_id is None
     assert db.ride("fresh") is None
@@ -141,3 +149,12 @@ def test_reconcile_warns_when_strava_token_unusable(db, token):
     h.processor._remember_token = token
     h.processor.reconcile()
     assert "STRAVA_REMEMBER_TOKEN" in h.notifier.messages[0]
+
+
+def describe_start() -> str:
+    return describe(Activity("w1", "f", ""), RIDE_START).removeprefix("ride from ")
+
+
+def test_describe_uses_name_or_falls_back_to_time():
+    assert describe(Activity("w1", "f", "Endurance Climb"), RIDE_START).startswith('"Endurance Climb" (')
+    assert describe(Activity("w1", "f", ""), RIDE_START).startswith("ride from ")

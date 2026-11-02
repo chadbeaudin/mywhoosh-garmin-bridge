@@ -48,7 +48,7 @@ A Strava activity is **MyWhoosh-origin** if its `device_name` identifies MyWhoos
 - **MyWhoosh client** and **FIT rewrite:** adapted from `marcelorodrigo/mywhoosh-to-garmin` (GPL-3.0, credited).
 - **Garmin client:** `garminconnect` 0.3, tokens persisted in `/data/garmin_tokens`. Tokens are seeded once, with MFA, through `docker exec -it <container> python -m bridge.garmin_login`.
 - **Reconciliation:** every 6h, check the last 5 MyWhoosh rides against the state DB and Garmin, to catch missed events. Rides younger than 4h are left to the event path, and rides from before the first start are never uploaded.
-- **Notifications:** Telegram message on any failure that needs a human: Strava delete failed (with the activity link), Strava token missing or expiring, or a job gave up after 6 attempts (Garmin login, MyWhoosh login, unmatched ride). Repeating alerts are limited to one a day.
+- **Notifications:** Telegram message for each ride outcome (uploaded to Garmin, Garmin already had it, Strava duplicate deleted or would-be-deleted in dry run), and on any failure that needs a human: Strava delete failed (with the activity link), Strava token missing or expiring, or a job gave up after 6 attempts (Garmin login, MyWhoosh login, unmatched ride). Repeating alerts are limited to one a day.
 - **Health:** `GET /healthz` for the Unraid/Docker healthcheck.
 
 ## Configuration (env)

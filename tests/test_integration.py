@@ -89,7 +89,8 @@ def test_dry_run_reports_the_duplicate_over_telegram(tmp_path, garmin_api):
     post_and_process(client, bridge, strava_payload())
     post_and_process(client, bridge, garmin_duplicate_payload())
     assert delete.call_count == 0
-    assert "would delete" in json.loads(telegram.calls[0].request.body)["text"]
+    texts = [json.loads(c.request.body)["text"] for c in telegram.calls]
+    assert "Uploaded" in texts[0] and "would delete" in texts[1]
 
 
 @responses.activate

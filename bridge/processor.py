@@ -28,6 +28,11 @@ def strava_link(activity_id: int) -> str:
     return f"https://www.strava.com/activities/{activity_id}"
 
 
+def describe(activity: Activity, start: int) -> str:
+    when = time.strftime("%a %b %-d %H:%M", time.localtime(start))
+    return f"\"{activity.name}\" ({when})" if activity.name else f"ride from {when}"
+
+
 class Processor:
     def __init__(
         self,
@@ -95,10 +100,15 @@ class Processor:
             status = "uploaded" if prior and prior.status == "uploading" else "already_on_garmin"
             self._db.save_ride(replace(ride, status=status))
             log.info("Garmin already has MyWhoosh ride %s; marked %s", activity.id, status)
+            if status == "uploaded":
+                self._notifier.send(f"Uploaded {describe(activity, start)} to Garmin Connect.")
+            else:
+                self._notifier.send(f"Garmin already had {describe(activity, start)}; nothing uploaded.")
             return
         self._db.save_ride(ride)
         self._garmin.upload(fit.as_garmin_edge(data), f"mywhoosh_{activity.id}")
         self._db.save_ride(replace(ride, status="uploaded"))
+        self._notifier.send(f"Uploaded {describe(activity, start)} to Garmin Connect.")
 
     def _delete_duplicate(self, activity: StravaActivity, ride: Ride) -> None:
         if self._dry_run:
@@ -112,6 +122,7 @@ class Processor:
             self._notifier.send(f"Couldn't delete Garmin duplicate {strava_link(activity.id)} ({e}). Delete it by hand.")
             return
         self._db.save_ride(replace(ride, strava_duplicate_id=activity.id, status="duplicate_deleted"))
+        self._notifier.send(f"Deleted the Garmin duplicate {strava_link(activity.id)} from Strava.")
 
     def reconcile(self) -> None:
         """Catch rides whose Strava event never arrived, and warn before the Strava cookie expires."""
