@@ -11,7 +11,7 @@ NOW = time.time()
 
 
 def uploaded_ride(**overrides) -> Ride:
-    fields = dict(mywhoosh_id="w1", start_time=RIDE_START, strava_mywhoosh_id=1001,
+    fields = dict(ride_id="w1", start_time=RIDE_START, strava_mywhoosh_id=1001,
                   strava_duplicate_id=None, status="uploaded", created=NOW - 600)
     fields.update(overrides)
     return Ride(**fields)
@@ -32,7 +32,7 @@ def test_mywhoosh_device_but_not_virtual_ride_is_ignored():
 def test_garmin_copy_of_uploaded_ride_is_duplicate():
     verdict = classify(StravaActivity(**garmin_duplicate_payload()), [uploaded_ride()], NOW)
     assert verdict.kind is Kind.DUPLICATE
-    assert verdict.ride.mywhoosh_id == "w1"
+    assert verdict.ride.ride_id == "w1"
 
 
 def test_ride_still_uploading_counts_as_awaiting_duplicate():
@@ -60,7 +60,7 @@ def test_each_rule_alone_prevents_deletion(payload, rides):
     assert classify(StravaActivity(**payload), rides, NOW).kind is Kind.IGNORE
 
 
-def test_duplicate_of_reconciled_ride_needs_review():
+def test_duplicate_of_ride_without_a_strava_id_needs_review():
     verdict = classify(StravaActivity(**garmin_duplicate_payload()), [uploaded_ride(strava_mywhoosh_id=None)], NOW)
     assert verdict.kind is Kind.DUPLICATE_UNVERIFIED
 

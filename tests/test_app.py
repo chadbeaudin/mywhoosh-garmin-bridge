@@ -7,8 +7,6 @@ from bridge.config import Settings
 from .conftest import ATHLETE_ID, strava_payload
 
 ENV = {
-    "MYWHOOSH_EMAIL": "m@example.com",
-    "MYWHOOSH_PASSWORD": "mp",
     "GARMIN_USERNAME": "g@example.com",
     "GARMIN_PASSWORD": "gp",
     "BRIDGE_SECRET": "s3cret",
@@ -65,8 +63,4 @@ def test_healthz_reports_worker_state(bridge):
     assert TestClient(create_app(bridge)).get("/healthz").status_code == 503
     with TestClient(create_app(bridge)) as running:
         assert running.get("/healthz").json() == {"worker_alive": True}
-    assert bridge.db.has_pending("reconcile")
-
-
-def test_build_records_install_time(bridge):
-    assert float(bridge.db.get("installed_at")) > 0
+    assert bridge.db.has_pending("token_check")

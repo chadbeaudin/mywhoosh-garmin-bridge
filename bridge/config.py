@@ -4,8 +4,6 @@ from dataclasses import dataclass
 from pathlib import Path
 
 REQUIRED = (
-    "MYWHOOSH_EMAIL",
-    "MYWHOOSH_PASSWORD",
     "GARMIN_USERNAME",
     "GARMIN_PASSWORD",
     "BRIDGE_SECRET",
@@ -15,8 +13,6 @@ REQUIRED = (
 
 @dataclass(frozen=True)
 class Settings:
-    mywhoosh_email: str
-    mywhoosh_password: str
     garmin_username: str
     garmin_password: str
     bridge_secret: str
@@ -26,7 +22,7 @@ class Settings:
     telegram_chat_id: str | None
     data_dir: Path
     dry_run: bool
-    reconcile_interval_hours: float
+    token_check_interval_hours: float
     port: int
 
     @property
@@ -47,8 +43,6 @@ class Settings:
         if missing:
             raise ValueError(f"Missing required environment variables: {', '.join(missing)}")
         return cls(
-            mywhoosh_email=env["MYWHOOSH_EMAIL"],
-            mywhoosh_password=env["MYWHOOSH_PASSWORD"],
             garmin_username=env["GARMIN_USERNAME"],
             garmin_password=env["GARMIN_PASSWORD"],
             bridge_secret=env["BRIDGE_SECRET"],
@@ -58,6 +52,6 @@ class Settings:
             telegram_chat_id=env.get("TELEGRAM_CHAT_ID") or None,
             data_dir=Path(env.get("DATA_DIR", "/data")),
             dry_run=env.get("DRY_RUN", "true").strip().lower() != "false",
-            reconcile_interval_hours=float(env.get("RECONCILE_INTERVAL_HOURS", "6")),
+            token_check_interval_hours=float(env.get("TOKEN_CHECK_INTERVAL_HOURS", "6")),
             port=int(env.get("PORT", "8080")),
         )

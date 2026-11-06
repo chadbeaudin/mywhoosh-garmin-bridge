@@ -1,6 +1,5 @@
 import hmac
 import logging
-import time
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from typing import Literal
@@ -11,7 +10,6 @@ from pydantic import BaseModel
 from .config import Settings
 from .db import Database
 from .garmin import GarminClient
-from .mywhoosh import MyWhooshClient
 from .notify import Notifier
 from .processor import Processor
 from .strava_web import RememberToken, StravaWeb
@@ -19,7 +17,7 @@ from .worker import Worker
 
 log = logging.getLogger(__name__)
 
-FIRST_RECONCILE_DELAY_SECONDS = 60
+FIRST_TOKEN_CHECK_DELAY_SECONDS = 60
 
 
 class StravaEvent(BaseModel):
@@ -41,28 +39,25 @@ class Bridge:
 
 def build(settings: Settings) -> Bridge:
     db = Database(settings.db_path)
-    if db.get("installed_at") is None:
-        db.put("installed_at", str(time.time()))
     notifier = Notifier(db, settings.telegram_bot_token, settings.telegram_chat_id)
     remember_token = RememberToken(settings.strava_remember_token, settings.strava_token_file)
     processor = Processor(
         db=db,
-        mywhoosh=MyWhooshClient(settings.mywhoosh_email, settings.mywhoosh_password),
         garmin=GarminClient(settings.garmin_username, settings.garmin_password, settings.garmin_token_dir),
         strava_web=StravaWeb(remember_token, settings.strava_athlete_id),
         remember_token=remember_token,
         notifier=notifier,
         dry_run=settings.dry_run,
     )
-    worker = Worker(db, processor, notifier, settings.reconcile_interval_hours * 3600)
+    worker = Worker(db, processor, notifier, settings.token_check_interval_hours * 3600)
     return Bridge(settings, db, worker)
 
 
 def create_app(bridge: Bridge) -> FastAPI:
     @asynccontextmanager
     async def lifespan(_: FastAPI):
-        if not bridge.db.has_pending("reconcile"):
-            bridge.db.enqueue("reconcile", {}, delay_seconds=FIRST_RECONCILE_DELAY_SECONDS)
+        if not bridge.db.has_pending("token_check"):
+            bridge.db.enqueue("token_check", {}, delay_seconds=FIRST_TOKEN_CHECK_DELAY_SECONDS)
         bridge.worker.start()
         log.info("Bridge started (dry_run=%s)", bridge.settings.dry_run)
         yield

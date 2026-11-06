@@ -1,18 +1,4 @@
-from bridge.mywhoosh import Activity
 from bridge.strava_web import StravaWebError
-
-
-class FakeMyWhoosh:
-    def __init__(self, rides: dict[str, bytes] | None = None):
-        self.rides = rides or {}
-        self.downloads: list[str] = []
-
-    def recent_activities(self, limit: int = 5) -> list[Activity]:
-        return [Activity(ride_id, f"file-{ride_id}", "Ride") for ride_id in list(self.rides)[:limit]]
-
-    def download(self, activity: Activity) -> bytes:
-        self.downloads.append(activity.id)
-        return self.rides[activity.id]
 
 
 class FakeGarmin:
@@ -31,9 +17,18 @@ class FakeGarmin:
 
 
 class FakeStravaWeb:
-    def __init__(self, error: Exception | None = None):
+    def __init__(self, original: bytes = b"", error: Exception | None = None, download_error: Exception | None = None):
+        self.original = original
+        self.downloads: list[int] = []
         self.deleted: list[int] = []
         self.error = error
+        self.download_error = download_error
+
+    def download_original(self, activity_id: int) -> bytes:
+        if self.download_error:
+            raise self.download_error
+        self.downloads.append(activity_id)
+        return self.original
 
     def delete_activity(self, activity_id: int) -> None:
         if self.error:
