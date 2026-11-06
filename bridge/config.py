@@ -24,6 +24,7 @@ class Settings:
     dry_run: bool
     token_check_interval_hours: float
     port: int
+    version: str
 
     @property
     def db_path(self) -> Path:
@@ -54,4 +55,5 @@ class Settings:
             dry_run=env.get("DRY_RUN", "true").strip().lower() != "false",
             token_check_interval_hours=float(env.get("TOKEN_CHECK_INTERVAL_HOURS", "6")),
             port=int(env.get("PORT", "8080")),
+            version=env.get("APP_VERSION", "dev"),
         )

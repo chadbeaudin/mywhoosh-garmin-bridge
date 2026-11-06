@@ -50,6 +50,7 @@ A Strava activity is **MyWhoosh-origin** if its `device_name` identifies MyWhoos
 - **Token check:** every 6h, check the Strava token. Rides whose event never reached the bridge are not caught.
 - **Notifications:** Telegram message for each ride outcome (uploaded to Garmin, Garmin already had it, Strava duplicate deleted or would-be-deleted in dry run), and on any failure that needs a human: Strava delete failed (with the activity link), Strava token missing or expiring, or a job gave up after 6 attempts (Garmin login, Strava download). Repeating alerts are limited to one a day.
 - **Health:** `GET /healthz` for the Unraid/Docker healthcheck.
+- **Startup log:** the version, settings and ride and job counts, then a live connection check of Strava, Garmin and Telegram. The checks run on the worker thread, so a slow service never delays startup, and a failed check is logged without stopping the bridge.
 
 ## Configuration (env)
 

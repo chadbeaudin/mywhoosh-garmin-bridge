@@ -1,3 +1,4 @@
+import logging
 import time
 
 import pytest
@@ -135,3 +136,27 @@ def test_check_warns_when_strava_token_unusable(db, token):
 
 def test_describe_gives_the_ride_time():
     assert describe(RIDE_START).startswith("ride from ")
+
+
+def test_log_connections_reports_each_service(db, caplog):
+    caplog.set_level(logging.INFO, logger="bridge.processor")
+    h = Harness(db, token_expires=1893456000)
+    h.processor.log_connections()
+    expires = time.strftime("%Y-%m-%d", time.localtime(1893456000))
+    assert [r.getMessage() for r in caplog.records] == [
+        f"Strava: connected, token expires {expires}",
+        "Garmin: connected",
+        "Telegram: not configured",
+    ]
+
+
+def test_a_failed_connection_is_logged_and_the_rest_still_run(db, caplog):
+    caplog.set_level(logging.INFO, logger="bridge.processor")
+    h = Harness(db, strava_error=StravaWebError("Strava rejected the remember token (not logged in)"))
+    h.garmin.login_error = RuntimeError("Garmin down")
+    h.processor.log_connections()
+    assert [(r.levelname, r.getMessage()) for r in caplog.records] == [
+        ("ERROR", "Strava: connection failed: Strava rejected the remember token (not logged in)"),
+        ("ERROR", "Garmin: connection failed: Garmin down"),
+        ("INFO", "Telegram: not configured"),
+    ]

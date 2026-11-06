@@ -41,6 +41,23 @@ class Processor:
         self._notifier = notifier
         self._dry_run = dry_run
 
+    def log_connections(self) -> None:
+        checks = (("Strava", self._strava_status), ("Garmin", self._garmin_status), ("Telegram", self._notifier.status))
+        for service, status in checks:
+            try:
+                log.info("%s: %s", service, status())
+            except Exception as e:
+                log.error("%s: connection failed: %s", service, e)
+
+    def _strava_status(self) -> str:
+        self._strava_web.check_login()
+        expires = time.strftime("%Y-%m-%d", time.localtime(self._remember_token.expires_at()))
+        return f"connected, token expires {expires}"
+
+    def _garmin_status(self) -> str:
+        self._garmin.login()
+        return "connected"
+
     def handle_activity(self, payload: dict) -> None:
         activity = StravaActivity(**payload)
         nearby = self._db.rides_near(activity.start_time, MATCH_TOLERANCE_SECONDS)

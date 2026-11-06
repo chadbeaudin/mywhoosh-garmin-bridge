@@ -8,6 +8,10 @@ class StubProcessor:
         self.error = error
         self.handled: list[dict] = []
         self.token_checks = 0
+        self.connections_logged = 0
+
+    def log_connections(self) -> None:
+        self.connections_logged += 1
 
     def handle_activity(self, payload: dict) -> None:
         if self.error:
@@ -71,3 +75,11 @@ def test_queued_job_of_a_retired_kind_is_finished_without_running(db):
     run_all(worker, db)
     assert not db.has_pending("reconcile")
     assert processor.handled == [] and processor.token_checks == 0
+
+
+def test_run_logs_connections_before_draining_jobs(db):
+    processor = StubProcessor()
+    worker = Worker(db, processor, FakeNotifier(), token_check_interval_seconds=3600)
+    worker.stop()
+    worker.run()
+    assert processor.connections_logged == 1

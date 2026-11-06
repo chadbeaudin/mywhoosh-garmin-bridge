@@ -55,6 +55,19 @@ def test_missing_csrf_fails(tmp_path):
 
 
 @responses.activate
+def test_check_login_passes_when_logged_in(tmp_path):
+    mock_logged_in()
+    web(tmp_path, make_jwt()).check_login()
+
+
+@responses.activate
+def test_check_login_rejected_when_not_logged_in(tmp_path):
+    responses.get(f"{BASE_URL}/me", status=302, headers={"Location": f"{BASE_URL}/login"})
+    with pytest.raises(StravaWebError, match="not logged in"):
+        web(tmp_path, make_jwt()).check_login()
+
+
+@responses.activate
 def test_download_returns_the_original_fit_file(tmp_path):
     mock_logged_in()
     responses.get(f"{BASE_URL}/activities/42/export_original", body=FIT_BYTES)

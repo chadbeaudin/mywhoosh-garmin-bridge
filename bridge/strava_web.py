@@ -89,6 +89,9 @@ class StravaWeb:
             raise StravaWebError("Strava rejected the remember token (not logged in)")
         return session
 
+    def check_login(self) -> None:
+        self._keep_refreshed_token(self._logged_in_session())
+
     def download_original(self, activity_id: int) -> bytes:
         session = self._logged_in_session()
         response = session.get(f"{BASE_URL}/activities/{activity_id}/export_original", allow_redirects=False, timeout=60)
