@@ -18,7 +18,7 @@ CREATE TABLE IF NOT EXISTS jobs (
 );
 CREATE INDEX IF NOT EXISTS jobs_pending ON jobs (status, run_after);
 CREATE TABLE IF NOT EXISTS rides (
-    mywhoosh_id TEXT PRIMARY KEY,
+    ride_id TEXT PRIMARY KEY,
     start_time INTEGER NOT NULL,
     strava_mywhoosh_id INTEGER,
     strava_duplicate_id INTEGER,
@@ -42,7 +42,7 @@ class Job:
 
 @dataclass(frozen=True)
 class Ride:
-    mywhoosh_id: str
+    ride_id: str
     start_time: int
     strava_mywhoosh_id: int | None
     strava_duplicate_id: int | None
@@ -58,6 +58,12 @@ class Database:
         self._lock = threading.Lock()
         with self._lock:
             self._conn.executescript(SCHEMA)
+            self._rename_legacy_ride_id()
+
+    def _rename_legacy_ride_id(self) -> None:
+        columns = {row["name"] for row in self._conn.execute("PRAGMA table_info(rides)")}
+        if "mywhoosh_id" in columns:
+            self._conn.execute("ALTER TABLE rides RENAME COLUMN mywhoosh_id TO ride_id")
 
     def _execute(self, sql: str, params: tuple = ()) -> list[sqlite3.Row]:
         with self._lock:
@@ -100,13 +106,13 @@ class Database:
 
     def save_ride(self, ride: Ride) -> None:
         self._execute(
-            "INSERT OR REPLACE INTO rides (mywhoosh_id, start_time, strava_mywhoosh_id, strava_duplicate_id, status, created) "
+            "INSERT OR REPLACE INTO rides (ride_id, start_time, strava_mywhoosh_id, strava_duplicate_id, status, created) "
             "VALUES (?, ?, ?, ?, ?, ?)",
-            (ride.mywhoosh_id, ride.start_time, ride.strava_mywhoosh_id, ride.strava_duplicate_id, ride.status, ride.created),
+            (ride.ride_id, ride.start_time, ride.strava_mywhoosh_id, ride.strava_duplicate_id, ride.status, ride.created),
         )
 
-    def ride(self, mywhoosh_id: str) -> Ride | None:
-        rows = self._execute("SELECT * FROM rides WHERE mywhoosh_id = ?", (mywhoosh_id,))
+    def ride(self, ride_id: str) -> Ride | None:
+        rows = self._execute("SELECT * FROM rides WHERE ride_id = ?", (ride_id,))
         return Ride(**dict(rows[0])) if rows else None
 
     def rides_near(self, start_time: int, tolerance_seconds: int) -> list[Ride]:

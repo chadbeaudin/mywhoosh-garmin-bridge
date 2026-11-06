@@ -1,4 +1,5 @@
-"""Deletes Strava activities through the website, since the API has had no delete endpoint since 2017.
+"""Downloads and deletes Strava activities through the website, since the bridge holds no API token
+and the API has had no delete endpoint since 2017.
 
 Follows pR0Ps/stravaweblib: password login is behind reCAPTCHA, so the session is the
 `strava_remember_token` cookie (a JWT, ~30 day lifetime) copied from a logged-in browser.
@@ -17,6 +18,7 @@ log = logging.getLogger(__name__)
 BASE_URL = "https://www.strava.com"
 CSRF_PARAM = re.compile(r'<meta[^>]+name="csrf-param"[^>]+content="([^"]+)"')
 CSRF_TOKEN = re.compile(r'<meta[^>]+name="csrf-token"[^>]+content="([^"]+)"')
+FIT_SIGNATURE = b".FIT"
 
 
 class StravaWebError(RuntimeError):
@@ -80,12 +82,27 @@ class StravaWeb:
             self._token.save(token)
             log.info("Saved refreshed Strava remember token")
 
-    def delete_activity(self, activity_id: int) -> None:
+    def _logged_in_session(self) -> requests.Session:
         session = self._session()
         me = session.get(f"{BASE_URL}/me", allow_redirects=False, timeout=30)
         if not me.is_redirect or not me.headers.get("Location", "").rstrip("/").endswith(f"/{self._athlete_id}"):
             raise StravaWebError("Strava rejected the remember token (not logged in)")
+        return session
 
+    def download_original(self, activity_id: int) -> bytes:
+        session = self._logged_in_session()
+        response = session.get(f"{BASE_URL}/activities/{activity_id}/export_original", allow_redirects=False, timeout=60)
+        self._keep_refreshed_token(session)
+        if response.status_code != 200:
+            raise StravaWebError(f"Strava download of {activity_id} failed (HTTP {response.status_code})")
+        if response.content[8:12] != FIT_SIGNATURE:
+            content_type = response.headers.get("Content-Type")
+            raise StravaWebError(f"Strava's original file for {activity_id} is not a FIT file ({content_type})")
+        log.info("Downloaded Strava activity %s (%d bytes)", activity_id, len(response.content))
+        return response.content
+
+    def delete_activity(self, activity_id: int) -> None:
+        session = self._logged_in_session()
         page = session.get(f"{BASE_URL}/about", timeout=30).text
         param, token = CSRF_PARAM.search(page), CSRF_TOKEN.search(page)
         if not (param and token):

@@ -1,3 +1,4 @@
+import sqlite3
 import time
 
 from bridge.db import Database, Ride
@@ -42,7 +43,7 @@ def test_jobs_and_rides_survive_reopen(tmp_path):
 def test_rides_near_orders_by_closeness(db):
     for ride_id, start in (("far", 150), ("near", 105), ("outside", 200)):
         db.save_ride(Ride(ride_id, start, None, None, "uploaded", 0))
-    assert [r.mywhoosh_id for r in db.rides_near(100, 60)] == ["near", "far"]
+    assert [r.ride_id for r in db.rides_near(100, 60)] == ["near", "far"]
 
 
 def test_kv_roundtrip(db):
@@ -50,3 +51,18 @@ def test_kv_roundtrip(db):
     db.put("k", "v")
     db.put("k", "v2")
     assert db.get("k") == "v2"
+
+
+def test_legacy_ride_id_column_is_renamed_and_rides_are_kept(tmp_path):
+    path = tmp_path / "legacy.db"
+    legacy = sqlite3.connect(path)
+    legacy.execute(
+        "CREATE TABLE rides (mywhoosh_id TEXT PRIMARY KEY, start_time INTEGER NOT NULL, strava_mywhoosh_id INTEGER, "
+        "strava_duplicate_id INTEGER, status TEXT NOT NULL, created REAL NOT NULL)"
+    )
+    legacy.execute("INSERT INTO rides VALUES ('w1', 100, 1001, NULL, 'uploaded', 1.0)")
+    legacy.commit()
+    legacy.close()
+
+    Database(path)
+    assert Database(path).ride("w1") == Ride("w1", 100, 1001, None, "uploaded", 1.0)

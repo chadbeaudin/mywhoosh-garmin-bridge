@@ -6,8 +6,9 @@ import responses
 
 from bridge.strava_web import BASE_URL, RememberToken, StravaWeb, StravaWebError
 
-from .conftest import ATHLETE_ID, make_jwt
+from .conftest import ATHLETE_ID, make_fit, make_jwt
 
+FIT_BYTES = make_fit()
 ABOUT_HTML = '<html><head><meta name="csrf-param" content="authenticity_token" /><meta name="csrf-token" content="CSRF123" /></head></html>'
 
 
@@ -51,6 +52,36 @@ def test_missing_csrf_fails(tmp_path):
     responses.get(f"{BASE_URL}/about", body="<html></html>")
     with pytest.raises(StravaWebError, match="CSRF"):
         web(tmp_path, make_jwt()).delete_activity(42)
+
+
+@responses.activate
+def test_download_returns_the_original_fit_file(tmp_path):
+    mock_logged_in()
+    responses.get(f"{BASE_URL}/activities/42/export_original", body=FIT_BYTES)
+    assert web(tmp_path, make_jwt()).download_original(42) == FIT_BYTES
+
+
+@responses.activate
+def test_download_rejected_when_not_logged_in(tmp_path):
+    responses.get(f"{BASE_URL}/me", status=302, headers={"Location": f"{BASE_URL}/login"})
+    with pytest.raises(StravaWebError, match="not logged in"):
+        web(tmp_path, make_jwt()).download_original(42)
+
+
+@responses.activate
+def test_download_failure_reports_the_status(tmp_path):
+    mock_logged_in()
+    responses.get(f"{BASE_URL}/activities/42/export_original", status=404)
+    with pytest.raises(StravaWebError, match="HTTP 404"):
+        web(tmp_path, make_jwt()).download_original(42)
+
+
+@responses.activate
+def test_download_rejects_an_original_that_is_not_fit(tmp_path):
+    mock_logged_in()
+    responses.get(f"{BASE_URL}/activities/42/export_original", json={"stream": []})
+    with pytest.raises(StravaWebError, match="not a FIT file .*application/json"):
+        web(tmp_path, make_jwt()).download_original(42)
 
 
 @pytest.mark.parametrize(
