@@ -14,6 +14,17 @@ class Notifier:
         self._bot_token = bot_token
         self._chat_id = chat_id
 
+    def status(self) -> str:
+        if not (self._bot_token and self._chat_id):
+            return "not configured"
+        try:
+            # Log only the error type: a requests error's text holds the URL, which holds the bot token.
+            response = requests.get(f"https://api.telegram.org/bot{self._bot_token}/getMe", timeout=10)
+            response.raise_for_status()
+        except requests.RequestException as e:
+            raise RuntimeError(type(e).__name__) from None
+        return "connected"
+
     def send(self, text: str, key: str | None = None, every_seconds: float = 24 * 3600) -> None:
         """Send a Telegram message; with a key, at most once per every_seconds for that key."""
         if key:
@@ -30,7 +41,7 @@ class Notifier:
                 timeout=10,
             ).raise_for_status()
         except requests.RequestException as e:
-            log.error("Telegram notification failed: %s", e)
+            log.error("Telegram notification failed: %s", type(e).__name__)
             return
         if key:
             self._db.put(f"notified:{key}", str(time.time()))

@@ -21,6 +21,7 @@ class Worker(threading.Thread):
         self._stop = threading.Event()
 
     def run(self) -> None:
+        self._processor.log_connections()
         while not self._stop.is_set():
             if not self.tick():
                 self._stop.wait(5)

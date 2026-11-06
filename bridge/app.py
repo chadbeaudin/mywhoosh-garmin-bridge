@@ -59,7 +59,16 @@ def create_app(bridge: Bridge) -> FastAPI:
         if not bridge.db.has_pending("token_check"):
             bridge.db.enqueue("token_check", {}, delay_seconds=FIRST_TOKEN_CHECK_DELAY_SECONDS)
         bridge.worker.start()
-        log.info("Bridge started (dry_run=%s)", bridge.settings.dry_run)
+        settings = bridge.settings
+        log.info(
+            "Bridge %s started (dry_run=%s, strava_athlete=%s, token_check_interval=%gh, data_dir=%s)",
+            settings.version, settings.dry_run, settings.strava_athlete_id,
+            settings.token_check_interval_hours, settings.data_dir,
+        )
+        log.info(
+            "State: %d rides, %d pending jobs, %d failed jobs",
+            bridge.db.count_rides(), bridge.db.count_jobs("pending"), bridge.db.count_jobs("failed"),
+        )
         yield
         bridge.worker.stop()
 

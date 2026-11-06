@@ -14,6 +14,8 @@ def configure_logging() -> None:
         format="%(asctime)s %(levelname)s %(name)s: %(message)s",
         force=True,
     )
+    # At DEBUG, urllib3 logs each request's URL, and Telegram's URLs hold the bot token.
+    logging.getLogger("urllib3").setLevel(logging.INFO)
 
 
 def main() -> None:

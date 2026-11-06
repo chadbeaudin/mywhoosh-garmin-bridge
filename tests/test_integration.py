@@ -1,5 +1,6 @@
 """End to end: StreetSweep events in, real clients out, with HTTP mocked at the boundary and a fake garminconnect."""
 import json
+import logging
 
 import pytest
 import responses
@@ -110,3 +111,19 @@ def test_ride_strava_cannot_supply_as_fit_is_retried_without_uploading(tmp_path,
     assert bridge.db.has_pending("strava_activity")
     assert bridge.db.ride("1001") is None
     assert all(api.uploaded == [] for api in garmin_api.instances)
+
+
+@responses.activate
+def test_worker_logs_live_connections_on_start(tmp_path, garmin_api, caplog):
+    caplog.set_level(logging.INFO, logger="bridge.processor")
+    mock_strava_delete()
+    responses.get("https://api.telegram.org/botBOT/getMe", json={"ok": True})
+    bridge = build(settings(tmp_path, dry_run=True))
+
+    bridge.worker.stop()
+    bridge.worker.run()
+
+    messages = [r.getMessage() for r in caplog.records]
+    assert messages[0].startswith("Strava: connected, token expires ")
+    assert messages[1:] == ["Garmin: connected", "Telegram: connected"]
+    assert garmin_api.instances[0].tokenstore == str(tmp_path / "garmin_tokens")

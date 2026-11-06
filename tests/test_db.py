@@ -66,3 +66,11 @@ def test_legacy_ride_id_column_is_renamed_and_rides_are_kept(tmp_path):
 
     Database(path)
     assert Database(path).ride("w1") == Ride("w1", 100, 1001, None, "uploaded", 1.0)
+
+
+def test_counts_rides_and_jobs_by_status(db):
+    db.save_ride(Ride("w1", 100, 1001, None, "uploaded", 1.0))
+    db.enqueue("a", {})
+    db.enqueue("b", {})
+    db.fail(db.next_job(), "bad")
+    assert (db.count_rides(), db.count_jobs("pending"), db.count_jobs("failed")) == (1, 1, 1)

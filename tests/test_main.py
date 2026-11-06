@@ -10,3 +10,9 @@ def test_logging_reaches_info_despite_fit_tool_configuring_root(monkeypatch, cap
     configure_logging()
     logging.getLogger("bridge.app").info("Bridge started")
     assert "INFO bridge.app: Bridge started" in capsys.readouterr().err
+
+
+def test_debug_logging_leaves_out_urllib3_request_urls(monkeypatch):
+    monkeypatch.setenv("LOG_LEVEL", "DEBUG")
+    configure_logging()
+    assert not logging.getLogger("urllib3.connectionpool").isEnabledFor(logging.DEBUG)

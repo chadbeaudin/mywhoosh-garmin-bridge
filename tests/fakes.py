@@ -6,6 +6,11 @@ class FakeGarmin:
         self.existing_starts = existing_starts or []
         self.uploads: list[tuple[bytes, str]] = []
         self.fail_upload = False
+        self.login_error: Exception | None = None
+
+    def login(self) -> None:
+        if self.login_error:
+            raise self.login_error
 
     def has_activity_near(self, start_time: int, tolerance_seconds: int = 60) -> bool:
         return any(abs(s - start_time) <= tolerance_seconds for s in self.existing_starts)
@@ -23,6 +28,10 @@ class FakeStravaWeb:
         self.deleted: list[int] = []
         self.error = error
         self.download_error = download_error
+
+    def check_login(self) -> None:
+        if self.error:
+            raise self.error
 
     def download_original(self, activity_id: int) -> bytes:
         if self.download_error:
@@ -50,6 +59,9 @@ class FakeRememberToken:
 class FakeNotifier:
     def __init__(self):
         self.messages: list[str] = []
+
+    def status(self) -> str:
+        return "not configured"
 
     def send(self, text: str, key: str | None = None, every_seconds: float = 0) -> None:
         self.messages.append(text)

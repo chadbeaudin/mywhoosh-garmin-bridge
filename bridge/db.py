@@ -122,6 +122,12 @@ class Database:
         )
         return [Ride(**dict(r)) for r in rows]
 
+    def count_rides(self) -> int:
+        return self._execute("SELECT COUNT(*) AS n FROM rides")[0]["n"]
+
+    def count_jobs(self, status: str) -> int:
+        return self._execute("SELECT COUNT(*) AS n FROM jobs WHERE status = ?", (status,))[0]["n"]
+
     def get(self, key: str) -> str | None:
         rows = self._execute("SELECT value FROM kv WHERE key = ?", (key,))
         return rows[0]["value"] if rows else None
