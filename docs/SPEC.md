@@ -22,6 +22,95 @@ The bridge never holds a Strava API token. Strava rotates refresh tokens, so a s
 6. Garmin pushes the uploaded ride to Strava, which reaches the bridge the same way.
 7. **Garmin-origin duplicate:** download its original file from Strava and verify it (below), save it to `/data/strava_backups/<activity id>.fit` so an accidental delete can be restored by re-uploading it, then delete it from Strava via the Strava web session. Nothing is deleted if the download, verification or backup fails. If the delete fails, send a Telegram notification with the activity link so it can be deleted by hand.
 
+## Diagrams
+
+### Components
+
+```mermaid
+flowchart LR
+    MW[MyWhoosh app]
+    TG[Telegram Bot API]
+
+    subgraph Strava
+        SAPI[Strava API]
+        SWEB[Strava website]
+    end
+
+    subgraph SS[StreetSweep]
+        HOOK["web: POST /api/strava/webhook"]
+        Q[(StravaSyncEvent queue)]
+        W["worker: athleteSyncWorker → forwardToBridge"]
+    end
+
+    subgraph BR[mywhoosh-garmin-bridge]
+        EV["POST /events"]
+        JQ[(jobs in state.db)]
+        P["worker: classify → Processor"]
+        DATA[("/data: state.db, garmin_tokens,<br/>strava_remember_token, strava_backups")]
+    end
+
+    GC[Garmin Connect]
+
+    MW -- uploads ride --> SAPI
+    SAPI -- "webhook: activity created" --> HOOK
+    HOOK --> Q --> W
+    W -- "GET /activities/{id} (StreetSweep's OAuth token)" --> SAPI
+    W -- "POST event + X-Bridge-Secret (LAN)" --> EV
+    EV --> JQ --> P
+    P -- "export_original / delete (remember-token cookie)" --> SWEB
+    P -- "check for ride, upload FIT" --> GC
+    P -- "step and failure messages" --> TG
+    P <--> DATA
+    GC -- "auto-sync creates the duplicate" --> SAPI
+```
+
+StreetSweep forwards only the owner's (`BRIDGE_ATHLETE_ID`) newly created activities, and never fails its own sync if the bridge is down. The bridge holds no Strava API token; it reaches Strava only through the website.
+
+### One ride
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant MW as MyWhoosh
+    participant ST as Strava
+    participant SS as StreetSweep
+    participant BR as Bridge
+    participant GC as Garmin Connect
+    participant TG as Telegram
+
+    MW->>ST: Upload ride (activity A)
+    ST->>SS: Webhook: A created
+    SS->>ST: GET /api/v3/activities/A
+    SS->>BR: POST /events {id, start_date, device_name, sport_type, total_photo_count, name}
+    BR-->>SS: 202 queued
+    Note over BR: Worker classifies A: MyWhoosh VirtualRide
+    BR->>ST: GET /activities/A/export_original
+    BR->>TG: Downloaded MyWhoosh ride A
+    BR->>GC: Activity within 60s of the start?
+    alt Garmin already has it
+        BR->>TG: Garmin already had A, nothing uploaded
+    else
+        BR->>GC: Upload FIT re-attributed to a Garmin Edge
+        BR->>TG: Uploaded A to Garmin Connect
+        GC->>ST: Auto-sync (activity B)
+        ST->>SS: Webhook: B created
+        SS->>ST: GET /api/v3/activities/B
+        SS->>BR: POST /events (B)
+        Note over BR: Worker classifies B: probable duplicate of A
+        BR->>ST: GET /activities/B/export_original
+        BR->>TG: Downloaded probable Garmin duplicate B
+        alt File isn't the bridge's upload
+            BR->>TG: B doesn't match, not deleted
+        else DRY_RUN=true
+            BR->>TG: DRY_RUN: verified, would delete B
+        else
+            Note over BR: Save /data/strava_backups/B.fit
+            BR->>ST: POST /activities/B (_method=delete)
+            BR->>TG: Deleted B, original saved
+        end
+    end
+```
+
 ## Classification
 
 A Strava activity is treated as the **duplicate to delete** only if all of these hold:
