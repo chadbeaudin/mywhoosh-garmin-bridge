@@ -53,13 +53,16 @@ def strava_payload(**overrides) -> dict:
         "device_name": "MyWhoosh",
         "sport_type": "VirtualRide",
         "total_photo_count": 1,
+        "name": "MyWhoosh - Tempo Ride",
     }
     payload.update(overrides)
     return payload
 
 
 def garmin_duplicate_payload(**overrides) -> dict:
-    return strava_payload(**{"id": 1002, "device_name": "Garmin Edge 840", "total_photo_count": 0, **overrides})
+    return strava_payload(**{
+        "id": 1002, "device_name": "Garmin Edge 840", "total_photo_count": 0, "name": "Virtual Cycling", **overrides,
+    })
 
 
 @pytest.fixture

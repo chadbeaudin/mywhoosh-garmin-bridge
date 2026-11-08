@@ -18,6 +18,7 @@ class StravaActivity:
     device_name: str | None
     sport_type: str | None
     total_photo_count: int
+    name: str | None = None
 
     @property
     def start_time(self) -> int:

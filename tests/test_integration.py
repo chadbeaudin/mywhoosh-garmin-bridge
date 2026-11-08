@@ -91,7 +91,8 @@ def test_dry_run_reports_the_duplicate_over_telegram(tmp_path, garmin_api):
     post_and_process(client, bridge, garmin_duplicate_payload())
     assert delete.call_count == 0
     texts = [json.loads(c.request.body)["text"] for c in telegram.calls]
-    assert "Uploaded" in texts[0] and "would delete" in texts[1]
+    assert [t.split(":")[1].split()[0] for t in texts] == ["Downloaded", "Uploaded", "Downloaded", "DRY_RUN"]
+    assert "would delete" in texts[-1] and '"Virtual Cycling"' in texts[-1]
 
 
 @responses.activate

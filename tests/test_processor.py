@@ -41,7 +41,21 @@ def test_mywhoosh_ride_is_uploaded_as_garmin_edge(db, tmp_path):
     assert file_id.manufacturer == 1
     ride = db.ride("1001")
     assert (ride.status, ride.strava_mywhoosh_id, ride.start_time) == ("uploaded", 1001, RIDE_START)
-    assert h.notifier.messages == [f"Uploaded {describe(RIDE_START)} to Garmin Connect."]
+    link = "https://www.strava.com/activities/1001"
+    assert h.notifier.messages == [
+        f'Downloaded MyWhoosh ride Strava activity 1001 "MyWhoosh - Tempo Ride" ({link}) from Strava.',
+        f'Uploaded Strava activity 1001 "MyWhoosh - Tempo Ride" ({link}) to Garmin Connect ({describe(RIDE_START)}).',
+    ]
+
+
+def test_activity_without_a_name_is_named_by_id(db, tmp_path):
+    h = Harness(db, tmp_path)
+    payload = strava_payload()
+    del payload["name"]
+    h.processor.handle_activity(payload)
+    assert h.notifier.messages[0] == (
+        "Downloaded MyWhoosh ride Strava activity 1001 (https://www.strava.com/activities/1001) from Strava."
+    )
 
 
 def test_failed_strava_download_is_left_for_the_worker_to_retry(db, tmp_path):
@@ -95,9 +109,11 @@ def test_garmin_duplicate_is_backed_up_then_deleted(db, tmp_path):
     assert backup.stat().st_mode & 0o777 == 0o600
     ride = db.ride("1001")
     assert (ride.status, ride.strava_duplicate_id) == ("duplicate_deleted", 1002)
-    assert h.notifier.messages[-1] == (
-        f"Deleted the Garmin duplicate https://www.strava.com/activities/1002 from Strava; its original is saved as {backup}."
-    )
+    activity = 'Strava activity 1002 "Virtual Cycling" (https://www.strava.com/activities/1002)'
+    assert h.notifier.messages[-2:] == [
+        f"Downloaded probable Garmin duplicate {activity} from Strava.",
+        f"Deleted Garmin duplicate {activity} from Strava; its original is saved as {backup}.",
+    ]
 
 
 def test_duplicate_whose_file_is_not_the_bridge_upload_is_not_deleted(db, tmp_path):

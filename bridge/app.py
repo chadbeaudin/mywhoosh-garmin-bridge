@@ -28,6 +28,7 @@ class StravaEvent(BaseModel):
     device_name: str | None = None
     sport_type: str | None = None
     total_photo_count: int = 0
+    name: str | None = None
 
 
 @dataclass(frozen=True)
