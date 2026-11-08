@@ -43,3 +43,11 @@ def as_garmin_edge(data: bytes) -> bytes:
                     setattr(message, field, value)
         builder.add(message)
     return builder.build().to_bytes()
+
+
+def is_garmin_edge_copy(data: bytes, ride_start: int, tolerance_seconds: int) -> bool:
+    """Whether a FIT file is what as_garmin_edge made of a ride starting at ride_start."""
+    file_id = next((r.message for r in FitFile.from_bytes(data).records if isinstance(r.message, FileIdMessage)), None)
+    if file_id is None or (file_id.manufacturer, file_id.product) != (Manufacturer.GARMIN.value, EDGE_840_PRODUCT):
+        return False
+    return abs(start_time(data) - ride_start) <= tolerance_seconds

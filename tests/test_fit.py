@@ -35,3 +35,15 @@ def test_as_garmin_edge_leaves_undefined_device_fields_alone():
     device = next(r.message for r in FitFile.from_bytes(rewritten).records if isinstance(r.message, DeviceInfoMessage))
     assert device.manufacturer == 1
     assert device.product is None
+
+
+def test_the_bridge_upload_is_recognised_as_its_garmin_edge_copy():
+    assert fit.is_garmin_edge_copy(fit.as_garmin_edge(make_fit()), RIDE_START + 30, tolerance_seconds=60)
+
+
+def test_a_file_not_reattributed_by_the_bridge_is_not_its_copy():
+    assert not fit.is_garmin_edge_copy(make_fit(), RIDE_START, tolerance_seconds=60)
+
+
+def test_a_garmin_edge_file_from_another_time_is_not_the_copy():
+    assert not fit.is_garmin_edge_copy(fit.as_garmin_edge(make_fit()), RIDE_START + 61, tolerance_seconds=60)

@@ -38,6 +38,10 @@ class Settings:
     def strava_token_file(self) -> Path:
         return self.data_dir / "strava_remember_token"
 
+    @property
+    def strava_backup_dir(self) -> Path:
+        return self.data_dir / "strava_backups"
+
     @classmethod
     def from_env(cls, env: Mapping[str, str] = os.environ) -> "Settings":
         missing = [k for k in REQUIRED if not env.get(k)]

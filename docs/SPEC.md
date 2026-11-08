@@ -20,7 +20,7 @@ The bridge never holds a Strava API token. Strava rotates refresh tokens, so a s
    3. Skip if Garmin already has an activity starting within 60s; otherwise upload to Garmin Connect.
    4. Record the ride in the state DB as `uploaded` (`uploading` while the upload is in flight).
 6. Garmin pushes the uploaded ride to Strava, which reaches the bridge the same way.
-7. **Garmin-origin duplicate:** delete it from Strava via the Strava web session. If the delete fails, send a Telegram notification with the activity link so it can be deleted by hand.
+7. **Garmin-origin duplicate:** download its original file from Strava and verify it (below), save it to `/data/strava_backups/<activity id>.fit` so an accidental delete can be restored by re-uploading it, then delete it from Strava via the Strava web session. Nothing is deleted if the download, verification or backup fails. If the delete fails, send a Telegram notification with the activity link so it can be deleted by hand.
 
 ## Classification
 
@@ -31,6 +31,8 @@ A Strava activity is treated as the **duplicate to delete** only if all of these
 - Its Strava activity ID is higher than the MyWhoosh copy's (Strava IDs increase with upload order).
 - It has no photos (`total_photo_count == 0`; the MyWhoosh copy carries the MyWhoosh ride image).
 - It is not the Strava activity ID of the MyWhoosh copy.
+
+The event's fields come from the webhook, so before deleting, the bridge also checks Strava's original file for the activity: it must be the FIT the bridge uploaded (Garmin manufacturer, the bridge's Edge product ID, start within 60s of the ride). A mismatch marks the ride `duplicate_needs_review` and notifies instead of deleting.
 
 If the MyWhoosh copy's Strava ID is unknown (rides recorded by earlier versions), the bridge only notifies with the link instead of deleting.
 

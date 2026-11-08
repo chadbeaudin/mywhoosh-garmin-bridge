@@ -48,6 +48,7 @@ def build(settings: Settings) -> Bridge:
         remember_token=remember_token,
         notifier=notifier,
         dry_run=settings.dry_run,
+        backup_dir=settings.strava_backup_dir,
     )
     worker = Worker(db, processor, notifier, settings.token_check_interval_hours * 3600)
     return Bridge(settings, db, worker)

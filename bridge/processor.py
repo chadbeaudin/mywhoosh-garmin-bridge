@@ -1,6 +1,7 @@
 import logging
 import time
 from dataclasses import replace
+from pathlib import Path
 
 import requests
 
@@ -9,7 +10,7 @@ from .classify import MATCH_TOLERANCE_SECONDS, Kind, StravaActivity, classify
 from .db import Database, Ride
 from .garmin import GarminClient
 from .notify import Notifier
-from .strava_web import RememberToken, StravaWeb, StravaWebError
+from .strava_web import RememberToken, StravaWeb, StravaWebError, write_private
 
 log = logging.getLogger(__name__)
 
@@ -33,6 +34,7 @@ class Processor:
         remember_token: RememberToken,
         notifier: Notifier,
         dry_run: bool,
+        backup_dir: Path,
     ):
         self._db = db
         self._garmin = garmin
@@ -40,6 +42,7 @@ class Processor:
         self._remember_token = remember_token
         self._notifier = notifier
         self._dry_run = dry_run
+        self._backup_dir = backup_dir
 
     def log_connections(self) -> None:
         checks = (("Strava", self._strava_status), ("Garmin", self._garmin_status), ("Telegram", self._notifier.status))
@@ -107,10 +110,20 @@ class Processor:
         self._notifier.send(f"Uploaded {describe(start)} to Garmin Connect.")
 
     def _delete_duplicate(self, activity: StravaActivity, ride: Ride) -> None:
+        # The event's own fields can't be trusted to authorize a delete, so check Strava's copy of the file.
+        original = self._strava_web.download_original(activity.id)
+        if not fit.is_garmin_edge_copy(original, ride.start_time, MATCH_TOLERANCE_SECONDS):
+            self._db.save_ride(replace(ride, strava_duplicate_id=activity.id, status="duplicate_needs_review"))
+            self._notifier.send(
+                f"Probable Garmin duplicate {strava_link(activity.id)} doesn't match the ride this bridge uploaded; not deleted."
+            )
+            return
         if self._dry_run:
             self._db.save_ride(replace(ride, strava_duplicate_id=activity.id, status="duplicate_dry_run"))
             self._notifier.send(f"DRY_RUN: would delete Garmin duplicate {strava_link(activity.id)}")
             return
+        backup = self._backup_dir / f"{activity.id}.fit"
+        write_private(backup, original)
         try:
             self._strava_web.delete_activity(activity.id)
         except (StravaWebError, requests.RequestException) as e:
@@ -118,7 +131,7 @@ class Processor:
             self._notifier.send(f"Couldn't delete Garmin duplicate {strava_link(activity.id)} ({e}). Delete it by hand.")
             return
         self._db.save_ride(replace(ride, strava_duplicate_id=activity.id, status="duplicate_deleted"))
-        self._notifier.send(f"Deleted the Garmin duplicate {strava_link(activity.id)} from Strava.")
+        self._notifier.send(f"Deleted the Garmin duplicate {strava_link(activity.id)} from Strava; its original is saved as {backup}.")
 
     def check_remember_token(self) -> None:
         """Warn before the Strava cookie expires."""
