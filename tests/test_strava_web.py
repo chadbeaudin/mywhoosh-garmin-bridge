@@ -122,6 +122,7 @@ def test_refreshed_token_from_strava_is_saved(tmp_path):
     )
     web(tmp_path, make_jwt()).delete_activity(42)
     assert (tmp_path / "token").read_text() == fresh
+    assert (tmp_path / "token").stat().st_mode & 0o777 == 0o600
 
 
 def test_remember_token_prefers_latest_expiry(tmp_path):
@@ -137,3 +138,18 @@ def test_remember_token_absent(tmp_path):
     store = RememberToken(None, tmp_path / "token")
     assert store.current() is None
     assert store.expires_at() is None
+
+
+def test_saved_token_is_readable_only_by_its_owner(tmp_path):
+    RememberToken(None, tmp_path / "token").save(make_jwt())
+    assert (tmp_path / "token").stat().st_mode & 0o777 == 0o600
+
+
+def test_saving_tightens_a_token_file_that_was_world_readable(tmp_path):
+    (tmp_path / "token").write_text("old")
+    (tmp_path / "token").chmod(0o644)
+    fresh = make_jwt()
+    RememberToken(None, tmp_path / "token").save(fresh)
+    assert (tmp_path / "token").stat().st_mode & 0o777 == 0o600
+    assert (tmp_path / "token").read_text() == fresh
+    assert (tmp_path / "token").stat().st_mode & 0o777 == 0o600

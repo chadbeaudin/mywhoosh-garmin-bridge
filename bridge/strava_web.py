@@ -50,6 +50,9 @@ class RememberToken:
 
     def save(self, token: str) -> None:
         self._store.parent.mkdir(parents=True, exist_ok=True)
+        self._store.touch(mode=0o600)
+        # touch keeps an existing file's mode, so tighten it before the token is written.
+        self._store.chmod(0o600)
         self._store.write_text(token)
 
     def _read_store(self) -> str | None:
