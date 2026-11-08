@@ -25,6 +25,17 @@ class StravaWebError(RuntimeError):
     pass
 
 
+def write_private(path: Path, data: str | bytes) -> None:
+    """Write a file only its owner can read, tightening one that already exists first."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.touch(mode=0o600)
+    path.chmod(0o600)
+    if isinstance(data, bytes):
+        path.write_bytes(data)
+    else:
+        path.write_text(data)
+
+
 def jwt_claims(token: str) -> dict:
     try:
         payload = token.split(".")[1]
@@ -49,11 +60,7 @@ class RememberToken:
         return jwt_claims(token).get("exp") if token else None
 
     def save(self, token: str) -> None:
-        self._store.parent.mkdir(parents=True, exist_ok=True)
-        self._store.touch(mode=0o600)
-        # touch keeps an existing file's mode, so tighten it before the token is written.
-        self._store.chmod(0o600)
-        self._store.write_text(token)
+        write_private(self._store, token)
 
     def _read_store(self) -> str | None:
         return self._store.read_text().strip() if self._store.exists() else None

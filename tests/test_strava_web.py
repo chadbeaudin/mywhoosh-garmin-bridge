@@ -4,7 +4,7 @@ from urllib.parse import parse_qs
 import pytest
 import responses
 
-from bridge.strava_web import BASE_URL, RememberToken, StravaWeb, StravaWebError
+from bridge.strava_web import BASE_URL, RememberToken, StravaWeb, StravaWebError, write_private
 
 from .conftest import ATHLETE_ID, make_fit, make_jwt
 
@@ -153,3 +153,9 @@ def test_saving_tightens_a_token_file_that_was_world_readable(tmp_path):
     assert (tmp_path / "token").stat().st_mode & 0o777 == 0o600
     assert (tmp_path / "token").read_text() == fresh
     assert (tmp_path / "token").stat().st_mode & 0o777 == 0o600
+
+
+def test_write_private_stores_bytes_readable_only_by_the_owner(tmp_path):
+    write_private(tmp_path / "nested" / "1002.fit", b".FIT")
+    assert (tmp_path / "nested" / "1002.fit").read_bytes() == b".FIT"
+    assert (tmp_path / "nested" / "1002.fit").stat().st_mode & 0o777 == 0o600

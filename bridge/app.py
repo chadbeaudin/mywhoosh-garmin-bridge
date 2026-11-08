@@ -28,6 +28,7 @@ class StravaEvent(BaseModel):
     device_name: str | None = None
     sport_type: str | None = None
     total_photo_count: int = 0
+    name: str | None = None
 
 
 @dataclass(frozen=True)
@@ -48,6 +49,7 @@ def build(settings: Settings) -> Bridge:
         remember_token=remember_token,
         notifier=notifier,
         dry_run=settings.dry_run,
+        backup_dir=settings.strava_backup_dir,
     )
     worker = Worker(db, processor, notifier, settings.token_check_interval_hours * 3600)
     return Bridge(settings, db, worker)

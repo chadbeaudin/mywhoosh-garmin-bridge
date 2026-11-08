@@ -35,8 +35,8 @@ def garmin_api(monkeypatch):
     return FakeGarminApi
 
 
-def mock_strava_download(body: bytes):
-    responses.get(f"{strava_web.BASE_URL}/activities/1001/export_original", body=body)
+def mock_strava_download(body: bytes, activity_id: int = 1001):
+    responses.get(f"{strava_web.BASE_URL}/activities/{activity_id}/export_original", body=body)
 
 
 def mock_strava_delete():
@@ -66,9 +66,12 @@ def test_ride_reaches_garmin_and_its_strava_duplicate_is_deleted(tmp_path, garmi
     assert (file_id.manufacturer, file_id.product) == (1, 4024)
     assert garmin_api.instances[0].tokenstore == str(tmp_path / "garmin_tokens")
 
+    # Garmin pushes the file it was sent back to Strava as the duplicate.
+    mock_strava_download(uploaded, activity_id=1002)
     post_and_process(client, bridge, garmin_duplicate_payload())
     assert delete.call_count == 1
     assert bridge.db.ride("1001").status == "duplicate_deleted"
+    assert (tmp_path / "strava_backups" / "1002.fit").read_bytes() == uploaded
 
     # A later edit event for the same ride changes nothing.
     post_and_process(client, bridge, garmin_duplicate_payload(aspect_type="update"))
@@ -84,10 +87,28 @@ def test_dry_run_reports_the_duplicate_over_telegram(tmp_path, garmin_api):
     client = TestClient(create_app(bridge))
 
     post_and_process(client, bridge, strava_payload())
+    mock_strava_download(garmin_api.instances[0].uploaded[0], activity_id=1002)
     post_and_process(client, bridge, garmin_duplicate_payload())
     assert delete.call_count == 0
     texts = [json.loads(c.request.body)["text"] for c in telegram.calls]
-    assert "Uploaded" in texts[0] and "would delete" in texts[1]
+    assert [t.split(":")[1].split()[0] for t in texts] == ["Downloaded", "Uploaded", "Downloaded", "DRY_RUN"]
+    assert "would delete" in texts[-1] and '"Virtual Cycling"' in texts[-1]
+
+
+@responses.activate
+def test_forged_duplicate_event_for_a_real_activity_deletes_nothing(tmp_path, garmin_api):
+    mock_strava_download(make_fit())
+    delete = mock_strava_delete()
+    bridge = build(settings(tmp_path, dry_run=False))
+    client = TestClient(create_app(bridge))
+
+    post_and_process(client, bridge, strava_payload())
+    # The event claims 1002 is the Garmin copy, but Strava's original for it is a different file.
+    mock_strava_download(make_fit(), activity_id=1002)
+    post_and_process(client, bridge, garmin_duplicate_payload())
+    assert delete.call_count == 0
+    assert bridge.db.ride("1001").status == "duplicate_needs_review"
+    assert not (tmp_path / "strava_backups").exists()
 
 
 @responses.activate
