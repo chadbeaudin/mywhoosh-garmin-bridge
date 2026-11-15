@@ -27,6 +27,7 @@ def replay(activity_id: int, athlete_id: int, strava_web: StravaWeb, db: Databas
         "start_date": datetime.fromtimestamp(start, timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
         "device_name": "MyWhoosh",
         "sport_type": "VirtualRide",
+        "total_photo_count": 0,
     })
 
 

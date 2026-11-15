@@ -23,6 +23,13 @@ It only ever deletes a Strava activity it caused; outdoor Garmin rides are never
 5. In StreetSweep's worker container set `BRIDGE_URL=http://<unraid-ip>:8095/events`, `BRIDGE_SECRET` (same value) and `BRIDGE_ATHLETE_ID`.
 6. Leave `DRY_RUN=true` for the first ride. The Telegram message and log show which Strava activity it would delete; when that's right, set `DRY_RUN=false`. If it instead says the activity doesn't match the ride the bridge uploaded, leave dry run on: nothing will be deleted until that check passes.
 
+### Recovering a missed ride
+
+If a ride never reached the bridge (for example the Strava token had expired), queue it by activity ID or URL:
+```sh
+docker exec mywhoosh-garmin-bridge python -m bridge.replay https://www.strava.com/activities/<id>
+```
+
 ### Automatic updates
 
 Every tested commit on `main` publishes `bigtimber/mywhoosh-garmin-bridge:latest`. Unraid has no built-in auto-update, so install **Auto Update Applications** from Community Applications, then under **Settings → Auto Update Applications → Docker Auto Update Settings** enable it for this container.
