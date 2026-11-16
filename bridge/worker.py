@@ -4,6 +4,7 @@ import threading
 from .db import Database, Job
 from .notify import Notifier
 from .processor import Processor
+from .strava_web import StravaAuthError
 
 log = logging.getLogger(__name__)
 
@@ -18,16 +19,17 @@ class Worker(threading.Thread):
         self._processor = processor
         self._notifier = notifier
         self._token_check_interval = token_check_interval_seconds
-        self._stop = threading.Event()
+        # Not _stop: that would overwrite a Thread internal and break is_alive().
+        self._stopping = threading.Event()
 
     def run(self) -> None:
         self._processor.log_connections()
-        while not self._stop.is_set():
+        while not self._stopping.is_set():
             if not self.tick():
-                self._stop.wait(5)
+                self._stopping.wait(5)
 
     def stop(self) -> None:
-        self._stop.set()
+        self._stopping.set()
 
     def tick(self) -> bool:
         """Run one due job; returns whether there was one."""
@@ -42,9 +44,17 @@ class Worker(threading.Thread):
             elif job.kind == "token_check":
                 self._processor.check_remember_token()
             self._db.complete(job)
+        except StravaAuthError as e:
+            self._wait_for_token(job, e)
         except Exception as e:
             self._retry_or_fail(job, e)
         return True
+
+    def _wait_for_token(self, job: Job, error: StravaAuthError) -> None:
+        # Retrying can't fix a bad token, so the job keeps its attempts and runs once the token is replaced.
+        log.warning("Job %s (%s) is waiting for a working Strava token: %s", job.id, job.kind, error)
+        self._db.postpone(job, RETRY_DELAY_SECONDS, str(error))
+        self._notifier.send(f"{error}. Rides wait until the Strava remember token is replaced.", key="strava_login")
 
     def _retry_or_fail(self, job: Job, error: Exception) -> None:
         message = f"{type(error).__name__}: {error}"

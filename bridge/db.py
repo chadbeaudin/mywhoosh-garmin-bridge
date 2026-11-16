@@ -98,6 +98,13 @@ class Database:
             (time.time() + delay_seconds, error, job.id),
         )
 
+    def postpone(self, job: Job, delay_seconds: float, error: str) -> None:
+        """Run the job again later without counting an attempt."""
+        self._execute(
+            "UPDATE jobs SET run_after = ?, last_error = ? WHERE id = ?",
+            (time.time() + delay_seconds, error, job.id),
+        )
+
     def fail(self, job: Job, error: str) -> None:
         self._execute(
             "UPDATE jobs SET status = 'failed', attempts = attempts + 1, last_error = ? WHERE id = ?",

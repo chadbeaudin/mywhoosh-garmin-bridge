@@ -141,14 +141,9 @@ class Processor:
         self._notifier.send(f"Deleted Garmin duplicate {label(activity)} from Strava; its original is saved as {backup}.")
 
     def check_remember_token(self) -> None:
-        """Warn before the Strava cookie expires."""
-        try:
-            expires_at = self._remember_token.expires_at()
-        except StravaWebError as e:
-            self._notifier.send(f"{e}. Rides can't sync until it's replaced.", key="strava_token")
-            return
-        if expires_at is None:
-            self._notifier.send("STRAVA_REMEMBER_TOKEN is not set; rides can't sync.", key="strava_token")
-        elif expires_at - time.time() < TOKEN_WARNING_SECONDS:
+        """Log in to Strava, which raises if the cookie no longer works, and warn before it expires."""
+        self._strava_web.check_login()
+        expires_at = self._remember_token.expires_at()
+        if expires_at - time.time() < TOKEN_WARNING_SECONDS:
             when = time.strftime("%Y-%m-%d", time.localtime(expires_at))
             self._notifier.send(f"Strava remember token expires {when}; paste a fresh one into the container.", key="strava_token")

@@ -15,8 +15,8 @@ The bridge never holds a Strava API token. Strava rotates refresh tokens, so a s
 3. StreetSweep's worker, which runs on Nastromo, fetches the activity with the token it already holds and forwards it over the LAN to the bridge's `POST /events` (see StreetSweep changes).
 4. The bridge classifies the activity (see Classification).
 5. **MyWhoosh-origin ride:**
-   1. Download the ride's original FIT file from Strava through the web session (`/activities/{id}/export_original`). Retry every 5 min, up to 6 attempts, if it fails. The bridge never logs into MyWhoosh: MyWhoosh allows one session per account, so a login would clash with the rider's iPad.
-   2. Rewrite the device to Garmin Edge 840 (manufacturer 1, product 4024) so Garmin counts it for training metrics.
+   1. Download the ride's original FIT file from Strava through the web session (`/activities/{id}/export_original`). Retry every 5 min, up to 6 attempts, if it fails. A job that fails because the Strava token is missing, expired or rejected doesn't use up attempts: it waits and runs once the token is replaced. The bridge never logs into MyWhoosh: MyWhoosh allows one session per account, so a login would clash with the rider's iPad.
+   2. Rewrite the device to Garmin Edge 840 (manufacturer 1, product 4062) so Garmin counts it for training metrics.
    3. Skip if Garmin already has an activity starting within 60s; otherwise upload to Garmin Connect.
    4. Record the ride in the state DB as `uploaded` (`uploading` while the upload is in flight).
 6. Garmin pushes the uploaded ride to Strava, which reaches the bridge the same way.
@@ -138,8 +138,8 @@ A Strava activity is **MyWhoosh-origin** if its `device_name` identifies MyWhoos
 - **Strava web client:** downloads the original upload and deletes by posting `_method=delete` with the CSRF token, as `stravaweblib` does. Password login is behind reCAPTCHA, so it uses the browser's `strava_remember_token` cookie (a JWT, ~30-day expiry). Any refreshed token Strava sets is saved to `/data`, and the token check warns over Telegram 5 days before expiry.
 - **FIT rewrite:** adapted from `marcelorodrigo/mywhoosh-to-garmin` (GPL-3.0, credited).
 - **Garmin client:** `garminconnect` 0.3, tokens persisted in `/data/garmin_tokens`. Tokens are seeded once, with MFA, through `docker exec -it <container> python -m bridge.garmin_login`.
-- **Token check:** every 6h, check the Strava token. Rides whose event never reached the bridge are not caught.
-- **Notifications:** Telegram message for each step, naming the Strava activity by ID, name (when the event carries one) and link: MyWhoosh ride downloaded, uploaded to Garmin or Garmin already had it, Garmin duplicate downloaded, then deleted with its backup path, would-be-deleted in dry run, or not deleted because its file didn't match, and on any failure that needs a human: Strava delete failed (with the activity link), Strava token missing or expiring, or a job gave up after 6 attempts (Garmin login, Strava download). Repeating alerts are limited to one a day.
+- **Token check:** every 6h, log in to Strava with the token and check its expiry. Rides whose event never reached the bridge are not caught.
+- **Notifications:** Telegram message for each step, naming the Strava activity by ID, name (when the event carries one) and link: MyWhoosh ride downloaded, uploaded to Garmin or Garmin already had it, Garmin duplicate downloaded, then deleted with its backup path, would-be-deleted in dry run, or not deleted because its file didn't match, and on any failure that needs a human: Strava delete failed (with the activity link), Strava token missing, rejected or expiring, or a job gave up after 6 attempts (Garmin login, Strava download). Repeating alerts are limited to one a day.
 - **Health:** `GET /healthz` for the Unraid/Docker healthcheck.
 - **Startup log:** the version, settings and ride and job counts, then a live connection check of Strava, Garmin and Telegram. The checks run on the worker thread, so a slow service never delays startup, and a failed check is logged without stopping the bridge.
 

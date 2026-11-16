@@ -25,6 +25,14 @@ def test_retry_delays_job_and_counts_attempt(db):
     assert db.has_pending("a")
 
 
+def test_postpone_delays_job_without_counting_attempt(db):
+    db.enqueue("a", {})
+    db.postpone(db.next_job(), 3600, "no token")
+    assert db.next_job() is None
+    db._execute("UPDATE jobs SET run_after = 0")
+    assert db.next_job().attempts == 0
+
+
 def test_failed_job_is_not_pending(db):
     db.enqueue("a", {})
     db.fail(db.next_job(), "boom")

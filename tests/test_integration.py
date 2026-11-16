@@ -63,7 +63,7 @@ def test_ride_reaches_garmin_and_its_strava_duplicate_is_deleted(tmp_path, garmi
     post_and_process(client, bridge, strava_payload())
     uploaded = garmin_api.instances[0].uploaded[0]
     file_id = next(r.message for r in FitFile.from_bytes(uploaded).records if isinstance(r.message, FileIdMessage))
-    assert (file_id.manufacturer, file_id.product) == (1, 4024)
+    assert (file_id.manufacturer, file_id.product) == (1, 4062)
     assert garmin_api.instances[0].tokenstore == str(tmp_path / "garmin_tokens")
 
     # Garmin pushes the file it was sent back to Strava as the duplicate.
@@ -132,6 +132,27 @@ def test_ride_strava_cannot_supply_as_fit_is_retried_without_uploading(tmp_path,
     assert bridge.db.has_pending("strava_activity")
     assert bridge.db.ride("1001") is None
     assert all(api.uploaded == [] for api in garmin_api.instances)
+
+
+@responses.activate
+def test_ride_that_arrives_while_strava_rejects_the_token_syncs_once_it_is_replaced(tmp_path, garmin_api):
+    base = strava_web.BASE_URL
+    rejected = responses.get(f"{base}/me", status=302, headers={"Location": f"{base}/login"})
+    telegram = responses.post(TELEGRAM, json={"ok": True})
+    bridge = build(settings(tmp_path, dry_run=True))
+
+    post_and_process(TestClient(create_app(bridge)), bridge, strava_payload())
+    assert bridge.db.ride("1001") is None
+    assert "rejected the remember token" in json.loads(telegram.calls[0].request.body)["text"]
+
+    responses.remove(rejected)
+    mock_strava_delete()
+    mock_strava_download(make_fit())
+    bridge.db._execute("UPDATE jobs SET run_after = 0 WHERE kind = 'strava_activity'")
+    while bridge.worker.tick():
+        pass
+    assert bridge.db.ride("1001").status == "uploaded"
+    assert bridge.db.count_jobs("failed") == 0
 
 
 @responses.activate

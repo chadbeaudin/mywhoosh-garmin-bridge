@@ -1,6 +1,3 @@
-from bridge.strava_web import StravaWebError
-
-
 class FakeGarmin:
     def __init__(self, existing_starts: list[int] | None = None):
         self.existing_starts = existing_starts or []
@@ -46,13 +43,10 @@ class FakeStravaWeb:
 
 
 class FakeRememberToken:
-    def __init__(self, expires_at: float | None = None, error: bool = False):
+    def __init__(self, expires_at: float | None = None):
         self._expires_at = expires_at
-        self._error = error
 
     def expires_at(self) -> float | None:
-        if self._error:
-            raise StravaWebError("STRAVA_REMEMBER_TOKEN is not a valid JWT")
         return self._expires_at
 
 

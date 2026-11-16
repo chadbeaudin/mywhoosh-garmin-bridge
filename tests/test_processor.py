@@ -7,7 +7,7 @@ from fit_tool.profile.messages.file_id_message import FileIdMessage
 
 from bridge.db import Ride
 from bridge.processor import Processor, describe
-from bridge.strava_web import StravaWebError
+from bridge.strava_web import StravaAuthError, StravaWebError
 
 from .conftest import RIDE_START, garmin_duplicate_payload, make_fit, strava_payload
 from .fakes import FakeGarmin, FakeNotifier, FakeRememberToken, FakeStravaWeb
@@ -188,12 +188,16 @@ def test_check_warns_when_strava_token_expires_soon(db, tmp_path):
     assert "expires" in h.notifier.messages[0]
 
 
-@pytest.mark.parametrize("token", [FakeRememberToken(None), FakeRememberToken(error=True)])
-def test_check_warns_when_strava_token_unusable(db, tmp_path, token):
+def test_check_raises_when_strava_rejects_a_token_that_has_not_expired(db, tmp_path):
+    h = Harness(db, tmp_path, strava_error=StravaAuthError("Strava rejected the remember token (not logged in)"))
+    with pytest.raises(StravaAuthError, match="rejected"):
+        h.processor.check_remember_token()
+
+
+def test_check_is_quiet_for_a_working_token(db, tmp_path):
     h = Harness(db, tmp_path)
-    h.processor._remember_token = token
     h.processor.check_remember_token()
-    assert "STRAVA_REMEMBER_TOKEN" in h.notifier.messages[0]
+    assert h.notifier.messages == []
 
 
 def test_describe_gives_the_ride_time():
