@@ -6,7 +6,7 @@ MyWhoosh only uploads to Strava. This container gets those rides into Garmin Con
 
 1. MyWhoosh uploads a ride to Strava.
 2. Strava notifies [StreetSweep](https://github.com/chadbeaudin/street-sweep), whose worker forwards the activity to this bridge over the LAN.
-3. The bridge downloads the ride's original FIT file from Strava (it never logs into MyWhoosh, so it can't clash with the single session you're riding on), re-attributes it to a Garmin Edge (so Garmin counts it for training metrics; Garmin Connect lists the device as an Edge 1030 Plus) and uploads it to Garmin Connect.
+3. The bridge downloads the ride's original FIT file from Strava (it never logs into MyWhoosh, so it can't clash with the single session you're riding on), re-attributes it to a Garmin Edge 840 (so Garmin counts it for training metrics) and uploads it to Garmin Connect.
 4. Garmin auto-syncs the ride back to Strava. The bridge recognises that copy (starts within 60s of a ride it uploaded in the last 48h, Garmin Edge device, uploaded after the MyWhoosh copy, no photos), confirms Strava's original file is the one it uploaded, saves that file to `/data/strava_backups/<activity id>.fit`, and deletes the copy through the Strava website, since the Strava API can't delete activities. To undo a delete, upload the saved file to Strava.
 
 It only ever deletes a Strava activity it caused; outdoor Garmin rides are never touched. Details are in [docs/SPEC.md](docs/SPEC.md).

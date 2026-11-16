@@ -3,10 +3,9 @@ from fit_tool.fit_file_builder import FitFileBuilder
 from fit_tool.profile.messages.device_info_message import DeviceInfoMessage
 from fit_tool.profile.messages.file_id_message import FileIdMessage
 from fit_tool.profile.messages.session_message import SessionMessage
-from fit_tool.profile.profile_type import Manufacturer
+from fit_tool.profile.profile_type import GarminProduct, Manufacturer
 
-# Garmin Edge 840; not in fit_tool's GarminProduct enum.
-EDGE_840_PRODUCT = 4024
+EDGE_840_PRODUCT = GarminProduct.EDGE_840.value
 EDGE_840_SOFTWARE_VERSION = 20.19
 
 

@@ -16,7 +16,7 @@ The bridge never holds a Strava API token. Strava rotates refresh tokens, so a s
 4. The bridge classifies the activity (see Classification).
 5. **MyWhoosh-origin ride:**
    1. Download the ride's original FIT file from Strava through the web session (`/activities/{id}/export_original`). Retry every 5 min, up to 6 attempts, if it fails. A job that fails because the Strava token is missing, expired or rejected doesn't use up attempts: it waits and runs once the token is replaced. The bridge never logs into MyWhoosh: MyWhoosh allows one session per account, so a login would clash with the rider's iPad.
-   2. Rewrite the device to Garmin Edge 840 (manufacturer 1, product 4024) so Garmin counts it for training metrics.
+   2. Rewrite the device to Garmin Edge 840 (manufacturer 1, product 4062) so Garmin counts it for training metrics.
    3. Skip if Garmin already has an activity starting within 60s; otherwise upload to Garmin Connect.
    4. Record the ride in the state DB as `uploaded` (`uploading` while the upload is in flight).
 6. Garmin pushes the uploaded ride to Strava, which reaches the bridge the same way.

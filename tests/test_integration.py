@@ -63,7 +63,7 @@ def test_ride_reaches_garmin_and_its_strava_duplicate_is_deleted(tmp_path, garmi
     post_and_process(client, bridge, strava_payload())
     uploaded = garmin_api.instances[0].uploaded[0]
     file_id = next(r.message for r in FitFile.from_bytes(uploaded).records if isinstance(r.message, FileIdMessage))
-    assert (file_id.manufacturer, file_id.product) == (1, 4024)
+    assert (file_id.manufacturer, file_id.product) == (1, 4062)
     assert garmin_api.instances[0].tokenstore == str(tmp_path / "garmin_tokens")
 
     # Garmin pushes the file it was sent back to Strava as the duplicate.
