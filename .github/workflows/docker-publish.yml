@@ -31,7 +31,7 @@ jobs:
           cache-dependency-path: requirements*.txt
 
       - name: Install dependencies
-        run: pip install -r requirements-dev.txt
+        run: pip install --require-hashes -r requirements-dev.txt
 
       - name: Run tests
         run: pytest -q

@@ -14,7 +14,7 @@ WORKDIR /app
 RUN apt-get update && apt-get install -y --no-install-recommends tzdata && rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir --require-hashes -r requirements.txt
 
 COPY bridge ./bridge
 RUN mkdir -p /data && chmod 777 /data

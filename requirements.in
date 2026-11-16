@@ -1,0 +1,5 @@
+fastapi==0.162.0
+uvicorn==0.54.0
+requests==2.34.2
+garminconnect==0.3.20
+fit-tool==0.9.17
