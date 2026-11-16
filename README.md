@@ -19,7 +19,7 @@ It only ever deletes a Strava activity it caused; outdoor Garmin rides are never
    ```sh
    docker exec -it mywhoosh-garmin-bridge python -m bridge.garmin_login
    ```
-4. **Strava remember token** (for downloading rides and deleting the duplicate): log in at strava.com in a browser, open DevTools → Application → Cookies → `https://www.strava.com`, and copy the value of `strava_remember_token`. It expires after about 30 days; the bridge warns over Telegram 5 days before.
+4. **Strava remember token** (for downloading rides and deleting the duplicate): log in at strava.com in a browser, open DevTools → Application → Cookies → `https://www.strava.com`, and copy the value of `strava_remember_token`. It expires after about 30 days; the bridge warns over Telegram 5 days before, and when Strava stops accepting it. Rides that arrive while the token doesn't work wait, and sync once you paste a fresh one.
 5. In StreetSweep's worker container set `BRIDGE_URL=http://<unraid-ip>:8095/events`, `BRIDGE_SECRET` (same value) and `BRIDGE_ATHLETE_ID`.
 6. Leave `DRY_RUN=true` for the first ride. The Telegram message and log show which Strava activity it would delete; when that's right, set `DRY_RUN=false`. If it instead says the activity doesn't match the ride the bridge uploaded, leave dry run on: nothing will be deleted until that check passes.
 

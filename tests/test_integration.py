@@ -135,6 +135,27 @@ def test_ride_strava_cannot_supply_as_fit_is_retried_without_uploading(tmp_path,
 
 
 @responses.activate
+def test_ride_that_arrives_while_strava_rejects_the_token_syncs_once_it_is_replaced(tmp_path, garmin_api):
+    base = strava_web.BASE_URL
+    rejected = responses.get(f"{base}/me", status=302, headers={"Location": f"{base}/login"})
+    telegram = responses.post(TELEGRAM, json={"ok": True})
+    bridge = build(settings(tmp_path, dry_run=True))
+
+    post_and_process(TestClient(create_app(bridge)), bridge, strava_payload())
+    assert bridge.db.ride("1001") is None
+    assert "rejected the remember token" in json.loads(telegram.calls[0].request.body)["text"]
+
+    responses.remove(rejected)
+    mock_strava_delete()
+    mock_strava_download(make_fit())
+    bridge.db._execute("UPDATE jobs SET run_after = 0 WHERE kind = 'strava_activity'")
+    while bridge.worker.tick():
+        pass
+    assert bridge.db.ride("1001").status == "uploaded"
+    assert bridge.db.count_jobs("failed") == 0
+
+
+@responses.activate
 def test_worker_logs_live_connections_on_start(tmp_path, garmin_api, caplog):
     caplog.set_level(logging.INFO, logger="bridge.processor")
     mock_strava_delete()

@@ -1,3 +1,4 @@
+from bridge.strava_web import StravaAuthError
 from bridge.worker import MAX_ATTEMPTS, Worker
 
 from .fakes import FakeNotifier
@@ -19,6 +20,8 @@ class StubProcessor:
         self.handled.append(payload)
 
     def check_remember_token(self) -> None:
+        if self.error:
+            raise self.error
         self.token_checks += 1
 
 
@@ -57,6 +60,36 @@ def test_failing_job_retries_then_gives_up_with_notification(db):
         db._execute("UPDATE jobs SET run_after = 0 WHERE status = 'pending' AND kind = 'strava_activity'")
     assert not db.has_pending("strava_activity")
     assert len(notifier.messages) == 1 and "not yet" in notifier.messages[0]
+
+
+def make_due(db) -> None:
+    db._execute("UPDATE jobs SET run_after = 0 WHERE status = 'pending'")
+
+
+def test_ride_waits_for_a_working_strava_token_then_syncs(db):
+    notifier = FakeNotifier()
+    processor = StubProcessor(StravaAuthError("Strava remember token has expired"))
+    worker = Worker(db, processor, notifier, token_check_interval_seconds=3600)
+    db.enqueue("strava_activity", {"id": 1})
+    for _ in range(MAX_ATTEMPTS + 1):
+        worker.tick()
+        make_due(db)
+    assert db.next_job().attempts == 0
+    assert db.count_jobs("failed") == 0
+    assert "expired" in notifier.messages[0] and "Gave up" not in " ".join(notifier.messages)
+
+    processor.error = None
+    run_all(worker, db)
+    assert processor.handled == [{"id": 1}]
+
+
+def test_token_check_that_cannot_log_in_alerts_and_stays_scheduled(db):
+    notifier = FakeNotifier()
+    worker = Worker(db, StubProcessor(StravaAuthError("Strava rejected the remember token (not logged in)")), notifier, 3600)
+    db.enqueue("token_check", {})
+    worker.tick()
+    assert "rejected" in notifier.messages[0]
+    assert db.has_pending("token_check") and db.count_jobs("failed") == 0
 
 
 def test_unexpected_error_is_retried(db):

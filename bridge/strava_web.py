@@ -25,6 +25,10 @@ class StravaWebError(RuntimeError):
     pass
 
 
+class StravaAuthError(StravaWebError):
+    """The remember token is missing or Strava won't accept it; nothing works until it's replaced."""
+
+
 def write_private(path: Path, data: str | bytes) -> None:
     """Write a file only its owner can read, tightening one that already exists first."""
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -41,7 +45,7 @@ def jwt_claims(token: str) -> dict:
         payload = token.split(".")[1]
         return json.loads(base64.urlsafe_b64decode(payload + "=" * (-len(payload) % 4)))
     except (IndexError, ValueError) as e:
-        raise StravaWebError("STRAVA_REMEMBER_TOKEN is not a valid JWT") from e
+        raise StravaAuthError("STRAVA_REMEMBER_TOKEN is not a valid JWT") from e
 
 
 class RememberToken:
@@ -74,12 +78,12 @@ class StravaWeb:
     def _session(self) -> requests.Session:
         token = self._token.current()
         if not token:
-            raise StravaWebError("STRAVA_REMEMBER_TOKEN is not set")
+            raise StravaAuthError("STRAVA_REMEMBER_TOKEN is not set")
         claims = jwt_claims(token)
         if claims.get("exp", 0) < time.time():
-            raise StravaWebError("Strava remember token has expired")
+            raise StravaAuthError("Strava remember token has expired")
         if str(claims.get("sub")) != str(self._athlete_id):
-            raise StravaWebError("Strava remember token belongs to a different athlete")
+            raise StravaAuthError("Strava remember token belongs to a different athlete")
         session = requests.Session()
         session.headers["Accept"] = "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
         session.cookies.set("strava_remember_id", str(claims["sub"]), domain=".strava.com", secure=True)
@@ -96,7 +100,7 @@ class StravaWeb:
         session = self._session()
         me = session.get(f"{BASE_URL}/me", allow_redirects=False, timeout=30)
         if not me.is_redirect or not me.headers.get("Location", "").rstrip("/").endswith(f"/{self._athlete_id}"):
-            raise StravaWebError("Strava rejected the remember token (not logged in)")
+            raise StravaAuthError("Strava rejected the remember token (not logged in)")
         return session
 
     def check_login(self) -> None:

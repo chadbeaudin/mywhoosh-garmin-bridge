@@ -4,7 +4,7 @@ from urllib.parse import parse_qs
 import pytest
 import responses
 
-from bridge.strava_web import BASE_URL, RememberToken, StravaWeb, StravaWebError, write_private
+from bridge.strava_web import BASE_URL, RememberToken, StravaAuthError, StravaWeb, StravaWebError, write_private
 
 from .conftest import ATHLETE_ID, make_fit, make_jwt
 
@@ -63,7 +63,7 @@ def test_check_login_passes_when_logged_in(tmp_path):
 @responses.activate
 def test_check_login_rejected_when_not_logged_in(tmp_path):
     responses.get(f"{BASE_URL}/me", status=302, headers={"Location": f"{BASE_URL}/login"})
-    with pytest.raises(StravaWebError, match="not logged in"):
+    with pytest.raises(StravaAuthError, match="not logged in"):
         web(tmp_path, make_jwt()).check_login()
 
 
@@ -107,7 +107,7 @@ def test_download_rejects_an_original_that_is_not_fit(tmp_path):
     ],
 )
 def test_unusable_token_fails_before_any_request(tmp_path, token, message):
-    with pytest.raises(StravaWebError, match=message):
+    with pytest.raises(StravaAuthError, match=message):
         web(tmp_path, token).delete_activity(42)
 
 
