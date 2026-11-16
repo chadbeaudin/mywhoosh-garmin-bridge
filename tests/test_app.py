@@ -76,6 +76,14 @@ def test_healthz_reports_worker_state(bridge, monkeypatch):
     assert bridge.db.has_pending("token_check")
 
 
+def test_healthz_reports_a_worker_that_has_died(bridge, monkeypatch):
+    monkeypatch.setattr(garmin, "Garmin", FakeGarminApi)
+    bridge.worker.stop()
+    bridge.worker.start()
+    bridge.worker.join()
+    assert TestClient(create_app(bridge)).get("/healthz").status_code == 503
+
+
 def test_startup_logs_version_settings_and_state(tmp_path, monkeypatch, caplog):
     monkeypatch.setattr(garmin, "Garmin", FakeGarminApi)
     caplog.set_level(logging.INFO, logger="bridge.app")

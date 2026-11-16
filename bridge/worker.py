@@ -19,16 +19,17 @@ class Worker(threading.Thread):
         self._processor = processor
         self._notifier = notifier
         self._token_check_interval = token_check_interval_seconds
-        self._stop = threading.Event()
+        # Not _stop: that would overwrite a Thread internal and break is_alive().
+        self._stopping = threading.Event()
 
     def run(self) -> None:
         self._processor.log_connections()
-        while not self._stop.is_set():
+        while not self._stopping.is_set():
             if not self.tick():
-                self._stop.wait(5)
+                self._stopping.wait(5)
 
     def stop(self) -> None:
-        self._stop.set()
+        self._stopping.set()
 
     def tick(self) -> bool:
         """Run one due job; returns whether there was one."""
