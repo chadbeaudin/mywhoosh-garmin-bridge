@@ -38,8 +38,14 @@ Every tested commit on `main` publishes `bigtimber/mywhoosh-garmin-bridge:latest
 
 ```sh
 python3.12 -m venv .venv
-.venv/bin/pip install -r requirements-dev.txt
+.venv/bin/pip install --require-hashes -r requirements-dev.txt
 .venv/bin/pytest
+```
+
+Dependencies are declared in `requirements.in` and `requirements-dev.in`. After changing one, regenerate the pinned, hashed `.txt` files with [pip-tools](https://pip-tools.readthedocs.io):
+```sh
+pip-compile --generate-hashes --allow-unsafe --strip-extras -o requirements.txt requirements.in
+pip-compile --generate-hashes --allow-unsafe --strip-extras -o requirements-dev.txt requirements-dev.in
 ```
 
 ## Credits
